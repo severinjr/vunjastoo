@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VunjaStoo - Mfumo wa Mauzo na Stoo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #10b981; --primary-dark: #059669; --blue: #3b82f6; --danger: #ef4444; --bg: #f4f7f6; --warning: #f59e0b; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: auto; }
+        
+        /* Auth Screens */
+        .auth-card { max-width: 450px; margin: 40px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .auth-card h1 { color: var(--primary-dark); text-align: center; margin-bottom: 5px; }
+        .auth-card p { text-align: center; color: #666; margin-bottom: 20px; font-size: 14px; }
+        .toggle-auth { text-align: center; margin-top: 15px; font-size: 14px; }
+        .toggle-auth a { color: var(--blue); text-decoration: none; font-weight: bold; cursor: pointer; }
+
+        /* Dashboard Header */
+        header { background-color: var(--primary); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        header h1 { margin: 0; font-size: 22px; }
+        header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.9; }
+        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn-action { background-color: rgba(0,0,0,0.2); padding: 8px 14px; font-size: 14px; border-radius: 6px; border: none; color: white; cursor: pointer; width: auto; }
+        .btn-action:hover { background-color: rgba(0,0,0,0.35); }
+        
+        select.lang-select { background: white; color: #333; padding: 6px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; width: auto; margin: 0; }
+
+        /* Paywall Banner Notice */
+        .paywall-banner { background: #fffbeb; border: 2px dashed var(--warning); padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+        .paywall-banner h3 { color: #92400e; margin-top: 0; }
+        .paywall-banner p { color: #78350f; font-size: 14px; }
+
+        /* Stats Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .stat-card.profit { border-left-color: var(--blue); }
+        .stat-card.warning { border-left-color: var(--danger); }
+        .stat-card small { color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+        .stat-card h3 { margin: 8px 0 0 0; font-size: 22px; color: #111827; }
+
+        /* Main Grid */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: var(--primary-dark); border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; font-size: 18px; }
+        input, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        button { background-color: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; font-size: 15px; transition: 0.2s; }
+        button:hover { background-color: var(--primary-dark); }
+
+        /* Table & Actions */
+        .table-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .search-box { max-width: 300px; margin: 0; }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        th { background-color: #f9fafb; color: #374151; }
+        .badge-low { background-color: #fee2e2; color: #b91c1c; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 12px; }
+        .badge-ok { background-color: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 12px; }
+        .badge-pending { background-color: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 12px; }
+        
+        .action-btns { display: flex; gap: 5px; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; width: auto; margin: 0; }
+        .btn-restock { background-color: var(--blue); }
+        .btn-delete { background-color: var(--danger); }
+        .btn-activate { background-color: var(--primary); }
+
+        .hidden { display: none !important; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .search-box { max-width: 100%; } }
+    </style>
+</head>
+<body>
+
+<!-- 1. UKURASA WA KUINGIA (LOGIN FORM) -->
+<div id="loginSection" class="auth-card">
+    <h1 style="color: var(--primary-dark); text-align: center; margin-bottom: 5px;">VunjaStoo</h1>
+    <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 14px;">Ingia kwenye mfumo wa duka lako</p>
+    <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Barua Pepe (Email)" required>
+        <input type="password" id="loginPassword" placeholder="Nenosiri (Password)" required>
+        <button type="submit">Ingia kwenye Mfumo</button>
+    </form>
+    <div class="toggle-auth">
+        <span>Huna akaunti?</span> <a onclick="showRegister()" style="color: var(--blue); font-weight: bold; cursor: pointer;">Jisajili Hapa</a>
+    </div>
+</div>
+
+<!-- 2. UKURASA WA KUSAJILI (REGISTER FORM) -->
+<div id="registerSection" class="auth-card hidden">
+    <h1 style="color: var(--primary-dark); text-align: center; margin-bottom: 5px;">Fungua Akaunti</h1>
+    <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 14px;">Jaza taarifa zako ili uanze kutumia VunjaStoo</p>
+    <form id="registerForm">
+        <input type="text" id="regFullName" placeholder="Jina Lako Kamili" required>
+        <input type="email" id="regEmail" placeholder="Barua Pepe (Email)" required>
+        <input type="text" id="regPhone" placeholder="Namba ya Simu" required>
+        <input type="text" id="regStoreName" placeholder="Jina la Duka Lako" required>
+        <input type="password" id="regPassword" placeholder="Nenosiri (herufi 6+)" minlength="6" required>
+        <button type="submit" style="background-color: var(--blue);">Kamilisha Usajili</button>
+    </form>
+    <div class="toggle-auth">
+        <span>Tayari una akaunti?</span> <a onclick="showLogin()" style="color: var(--blue); font-weight: bold; cursor: pointer;">Ingia Hapa</a>
+    </div>
+</div>
+
+<!-- 3. DASHBODI KUU YA DUKA (APP SECTION) -->
+<div id="appSection" class="container hidden">
+    <header>
+        <div>
+            <h1 id="storeNameDisplay">Duka Langu</h1>
+            <p id="userInfoDisplay">Mtumiaji: ...</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-action hidden" id="adminPanelBtn" onclick="openAdminModal()">⚙️ Admin Panel</button>
+            <button class="btn-action" onclick="logoutUser()">Toka (Logout)</button>
+        </div>
+    </header>
+
+    <!-- ZUIO LA MALIPO (PAYWALL BANNER) -->
+    <div id="paywallBanner" class="paywall-banner hidden">
+        <h3>⚠️ Akaunti Inahitaji Malipo / Uhakiki</h3>
+        <p>Ili uweze kuongeza bidhaa na kufanya mauzo, tafadhali kamilisha malipo ya ada ya mfumo kwenda namba: <strong>0712-345678 (Admin Mkuu)</strong> kisha wataarifu kupitia simu au WhatsApp ili akaunti yako iamilishwe.</p>
+    </div>
+
+    <!-- Muhtasari wa Hesabu za Leo -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <small>Mauzo ya Leo</small>
+            <h3 id="totalSalesToday">0 TZS</h3>
+        </div>
+        <div class="stat-card profit">
+            <small>Faida Halisi ya Leo</small>
+            <h3 id="totalProfitToday">0 TZS</h3>
+        </div>
+        <div class="stat-card warning">
+            <small>Bidhaa Zinazokaribia Kuisha (&lt; 5)</small>
+            <h3 id="lowStockCount">0</h3>
+        </div>
+    </div>
+
+    <div class="grid" id="mainAppGrid">
+        <!-- Kuongeza Bidhaa Mpya -->
+        <div class="card">
+            <h2>+ Ongeza Bidhaa Mpya</h2>
+            <form id="productForm">
+                <input type="text" id="name" placeholder="Jina la Bidhaa (mf. Sukari 1kg)" required>
+                <input type="text" id="category" placeholder="Aina / Kitengo (mf. Vyakula)" required>
+                <input type="number" id="buying_price" placeholder="Bei ya Kununua / Mtaji (TZS)" min="0" required>
+                <input type="number" id="selling_price" placeholder="Bei ya Kuuzia (TZS)" min="0" required>
+                <input type="number" id="quantity" placeholder="Idadi Iliyopo Stoo" min="0" required>
+                <button type="submit">Hifadhi Bidhaa</button>
+            </form>
+        </div>
+
+        <!-- Kikapu cha Mauzo (POS Cart) -->
+        <div class="card">
+            <h2>🛒 Kikapu cha Mauzo (POS Cart)</h2>
+            <form id="addToCartForm">
+                <select id="productSelect" required>
+                    <option value="">-- Chagua Bidhaa --</option>
+                </select>
+                <input type="number" id="sellQuantity" placeholder="Idadi" min="1" required>
+                <button type="submit" style="background-color: var(--blue);">+ Weka Kwenye Kikapu</button>
+            </form>
+
+            <div style="margin-top: 15px;">
+                <div class="table-responsive">
+                    <table style="font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>Bidhaa</th>
+                                <th>Idadi</th>
+                                <th>Jumla</th>
+                                <th>Ondoa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cartTableBody">
+                            <tr><td colspan="4" style="text-align: center; color: #777;">Kikapu ni tupu</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-weight: bold;">
+                    <span>Jumla Kuu: <span id="cartGrandTotal" style="color: var(--primary-dark);">0 TZS</span></span>
+                    <button id="btnCompleteCartSale" onclick="checkoutCart()" class="btn-sm" style="background-color: var(--primary); padding: 8px 15px;" disabled>Kamilisha Mauzo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orodha ya Bidhaa Zilizopo Stoo -->
+    <div class="card" style="margin-top: 20px;">
+        <div class="table-header">
+            <h2 style="border:none; margin:0; padding:0;">📦 Orodha ya Bidhaa Stoo</h2>
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Tafuta jina au aina ya bidhaa...">
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Jina la Bidhaa</th>
+                        <th>Kitengo</th>
+                        <th>Mtaji</th>
+                        <th>Bei ya Kuuza</th>
+                        <th>Iliyobaki</th>
+                        <th>Hatua</th>
+                    </tr>
+                </thead>
+                <tbody id="productsTable">
+                    <tr><td colspan="6">Inapakia data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 4. MODAL YA RISITI (DIGITAL RECEIPT MODAL) -->
+<div id="receiptModal" class="container hidden" style="position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:1000;">
+    <div class="card" style="width: 90%; max-width: 400px; text-align: center;">
+        <h2 id="receiptStoreName" style="margin-bottom: 5px; border:none; color:#111;">VunjaStoo</h2>
+        <p style="margin: 0; font-size: 12px; color: #666;" id="receiptDate">Tarehe: --</p>
+        <hr style="border: 1px dashed #ccc; margin: 15px 0;">
+        <div style="text-align: left; max-height: 200px; overflow-y: auto;" id="receiptItemsList"></div>
+        <hr style="border: 1px dashed #ccc; margin: 15px 0;">
+        <h3 style="display: flex; justify-content: space-between; margin: 10px 0;">
+            <span>Jumla Kuu:</span>
+            <span id="receiptTotalAmount">0 TZS</span>
+        </h3>
+        <p style="font-size: 11px; color: #555; margin-top: 15px;">Karibu tena! Asante kwa kununua kupitia VunjaStoo.</p>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button onclick="window.print()" class="btn-sm" style="background-color: var(--blue);">Chapisha / Print</button>
+            <button onclick="closeReceiptModal()" class="btn-sm" style="background-color: var(--danger);">Funga</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. MODAL YA ADMIN -->
+<div id="adminModal" class="container hidden" style="position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:999;">
+    <div class="card" style="width: 95%; max-width: 900px; max-height: 85vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom:10px;">
+            <h2 style="margin:0; border:none;">⚙️ Admin Control Panel - Orodha ya Wateja (Subscribers)</h2>
+            <button onclick="closeAdminModal()" style="width:auto; padding:5px 12px; background:var(--danger);">X</button>
+        </div>
+        <p style="margin-top:10px; font-size:14px; color:#555;">Hapa unaona wateja wote waliojisajili kwenye VunjaStoo:</p>
+        
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Jina Kamili</th>
+                        <th>Email</th>
+                        <th>Simu</th>
+                        <th>Jina la Duka</th>
+                        <th>Hali ya Malipo</th>
+                        <th>Hatua (Admin)</th>
+                    </tr>
+                </thead>
+                <tbody id="adminUsersTable">
+                    <tr><td colspan="6">Inapakia wateja...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://gaupvjhyiilffmdcpmqh.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_CzWQKSREkWtwbmzt6QKvlQ_MjPcLDIm';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let productsList = [];
+    let cartList = [];
+    let currentStoreName = 'VunjaStoo';
+
+    // Kubadilisha kati ya login na register
+    function showRegister() {
+        document.getElementById('loginSection').classList.add('hidden');
+        document.getElementById('registerSection').classList.remove('hidden');
+    }
+
+    function showLogin() {
+        document.getElementById('registerSection').classList.add('hidden');
+        document.getElementById('loginSection').classList.remove('hidden');
+    }
+
+    // USAJILI
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fullName = document.getElementById('regFullName').value;
+        const email = document.getElementById('regEmail').value;
+        const phone = document.getElementById('regPhone').value;
+        const storeName = document.getElementById('regStoreName').value;
+        const password = document.getElementById('regPassword').value;
+
+        const { data, error } = await db.auth.signUp({
+            email: email,
+            password: password,
+            options: { data: { full_name: fullName, phone: phone, store_name: storeName, is_paid: false } }
+        });
+
+        if (error) return alert('Hitilafu ya usajili: ' + error.message);
+
+        if (data.user) {
+            await db.from('profiles').insert([{
+                id: data.user.id,
+                full_name: fullName,
+                email: email,
+                phone: phone,
+                store_name: storeName,
+                is_paid: false
+            }]).catch(err => console.log('Profile info:', err));
+        }
+
+        alert('Usajili umekamilika! Sasa unaweza kuingia kwenye mfumo.');
+        document.getElementById('registerForm').reset();
+        showLogin();
+    });
+
+    // LOGIN
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+
+        const { error } = await db.auth.signInWithPassword({ email, password });
+        if (error) return alert('Imeshindwa kuingia: Hakikisha email au nenosiri ni sahihi.');
+
+        checkUserSession();
+    });
+
+    async function logoutUser() {
+        await db.auth.signOut();
+        checkUserSession();
+    }
+
+    // SESSION CHECK
+    async function checkUserSession() {
+        const { data: { session } } = await db.auth.getSession();
+        
+        if (session) {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('registerSection').classList.add('hidden');
+            document.getElementById('appSection').classList.remove('hidden');
+
+            const user = session.user;
+            const metadata = user.user_metadata || {};
+            currentStoreName = metadata.store_name || 'VunjaStoo';
+            const fullName = metadata.full_name || user.email;
+            let isPaid = metadata.is_paid || false;
+
+            document.getElementById('storeNameDisplay').innerText = currentStoreName;
+            document.getElementById('userInfoDisplay').innerText = `Mtumiaji: ${fullName} (${user.email})`;
+
+            const superAdminEmail = "severinfrank7@gmail.com"; 
+
+            if (user.email === superAdminEmail) {
+                document.getElementById('adminPanelBtn').classList.remove('hidden');
+                isPaid = true;
+            } else {
+                document.getElementById('adminPanelBtn').classList.add('hidden');
+            }
+
+            if (!isPaid && user.email !== superAdminEmail) {
+                document.getElementById('paywallBanner').classList.remove('hidden');
+                document.getElementById('mainAppGrid').classList.add('hidden');
+            } else {
+                document.getElementById('paywallBanner').classList.add('hidden');
+                document.getElementById('mainAppGrid').classList.remove('hidden');
+                loadProducts();
+                loadTodayStats();
+            }
+        } else {
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('registerSection').classList.add('hidden');
+            document.getElementById('appSection').classList.add('hidden');
+            document.getElementById('adminModal').classList.add('hidden');
+        }
+    }
+
+    // ADMIN PANEL
+    function openAdminModal() {
+        document.getElementById('adminModal').classList.remove('hidden');
+        loadAdminUsersList();
+    }
+
+    function closeAdminModal() {
+        document.getElementById('adminModal').classList.add('hidden');
+    }
+
+    async function loadAdminUsersList() {
+        const tableBody = document.getElementById('adminUsersTable');
+        tableBody.innerHTML = '<tr><td colspan="6">Inapakia wateja...</td></tr>';
+
+        const { data, error } = await db.from('profiles').select('*');
+
+        if (error || !data || data.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td>Severin Frank</td>
+                    <td>severinfrank7@gmail.com</td>
+                    <td>0712XXXXXX</td>
+                    <td>Duka Kuu</td>
+                    <td><span class="badge-ok">Active (Super Admin)</span></td>
+                    <td>-</td>
+                </tr>
+                <tr><td colspan="6" style="color: #666; text-align:center;">Hakuna wateja wengine waliokutwa.</td></tr>
+            `;
+            return;
+        }
+
+        tableBody.innerHTML = '';
+        data.forEach(user => {
+            const statusBadge = user.is_paid 
+                ? `<span class="badge-ok">Imelipia (Active)</span>` 
+                : `<span class="badge-pending">Haijalipia (Pending)</span>`;
+
+            const actionBtn = user.is_paid 
+                ? `<button class="btn-sm btn-delete" onclick="toggleUserStatus('${user.id}', false)">Zuia</button>` 
+                : `<button class="btn-sm btn-activate" onclick="toggleUserStatus('${user.id}', true)">Kubali / Washa</button>`;
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td><strong>${user.full_name || 'Mteja'}</strong></td>
+                    <td>${user.email}</td>
+                    <td>${user.phone || '-'}</td>
+                    <td>${user.store_name || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionBtn}</td>
+                </tr>
+            `;
+        });
+    }
+
+    window.toggleUserStatus = async (userId, newStatus) => {
+        const { error } = await db.from('profiles').update({ is_paid: newStatus }).eq('id', userId);
+        if (error) {
+            alert('Hitilafu: ' + error.message);
+        } else {
+            alert('Hali ya mtumiaji imebadilishwa mafanikio!');
+            loadAdminUsersList();
+        }
+    };
+
+    // BIDHAA
+    async function loadProducts() {
+        const { data, error } = await db.from('products').select('*').order('id', { ascending: false });
+        if (error) return;
+        productsList = data || [];
+        renderProducts(productsList);
+        updateLowStockCount();
+    }
+
+    function renderProducts(list) {
+        const tableBody = document.getElementById('productsTable');
+        const productSelect = document.getElementById('productSelect');
+        
+        tableBody.innerHTML = '';
+        productSelect.innerHTML = '<option value="">-- Chagua Bidhaa --</option>';
+
+        if (list.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6">Hakuna bidhaa zilizopatikana. Ongeza bidhaa mpya!</td></tr>';
+            return;
+        }
+
+        list.forEach(item => {
+            const isLow = item.quantity < 5;
+            const stockBadge = isLow 
+                ? `<span class="badge-low">${item.quantity} (Inaisha!)</span>` 
+                : `<span class="badge-ok">${item.quantity}</span>`;
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td><strong>${item.name}</strong></td>
+                    <td>${item.category || '-'}</td>
+                    <td>${Number(item.buying_price).toLocaleString()} TZS</td>
+                    <td>${Number(item.selling_price).toLocaleString()} TZS</td>
+                    <td>${stockBadge}</td>
+                    <td class="action-btns">
+                        <button class="btn-sm btn-restock" onclick="restockProduct(${item.id}, '${item.name}', ${item.quantity})">+ Stoo</button>
+                        <button class="btn-sm btn-delete" onclick="deleteProduct(${item.id}, '${item.name}')">Futa</button>
+                    </td>
+                </tr>
+            `;
+
+            if (item.quantity > 0) {
+                productSelect.innerHTML += `<option value="${item.id}">${item.name} (${Number(item.selling_price).toLocaleString()} TZS) - Stoo: ${item.quantity}</option>`;
+            }
+        });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = productsList.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            (p.category && p.category.toLowerCase().includes(term))
+        );
+        renderProducts(filtered);
+    });
+
+    function updateLowStockCount() {
+        const lowCount = productsList.filter(p => p.quantity < 5).length;
+        document.getElementById('lowStockCount').innerText = lowCount;
+    }
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return alert('Tafadhali ingia tena!');
+
+        const newProduct = {
+            name: document.getElementById('name').value,
+            category: document.getElementById('category').value,
+            buying_price: parseFloat(document.getElementById('buying_price').value),
+            selling_price: parseFloat(document.getElementById('selling_price').value),
+            quantity: parseInt(document.getElementById('quantity').value),
+            user_id: user.id
+        };
+
+        const { error } = await db.from('products').insert([newProduct]);
+        if (error) return alert('Hitilafu: ' + error.message);
+
+        alert('Bidhaa imeongezwa kikamilifu!');
+        document.getElementById('productForm').reset();
+        loadProducts();
+    });
+
+    window.restockProduct = async (id, name, currentQty) => {
+        const addQty = prompt(`Unataka kuongeza idadi ngapi kwa "${name}"?`);
+        if (addQty && !isNaN(addQty) && parseInt(addQty) > 0) {
+            const newQty = currentQty + parseInt(addQty);
+            const { error } = await db.from('products').update({ quantity: newQty }).eq('id', id);
+            if (error) return alert('Hitilafu: ' + error.message);
+            loadProducts();
+        }
+    };
+
+    window.deleteProduct = async (id, name) => {
+        if (confirm(`Una uhakika unataka kufuta "${name}"?`)) {
+            const { error } = await db.from('products').delete().eq('id', id);
+            if (error) return alert('Hitilafu kufuta: ' + error.message);
+            loadProducts();
+        }
+    };
+
+    // KIKAPU CHA MAUZO
+    document.getElementById('addToCartForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const productId = parseInt(document.getElementById('productSelect').value);
+        const qtySold = parseInt(document.getElementById('sellQuantity').value);
+        
+        const product = productsList.find(p => p.id === productId);
+        if (!product) return;
+
+        const existingInCart = cartList.find(item => item.product_id === productId);
+        const currentQtyInCart = existingInCart ? existingInCart.quantity : 0;
+
+        if ((qtySold + currentQtyInCart) > product.quantity) {
+            return alert('Idadi uliyoweka kwenye kikapu imezidi bidhaa zilizopo stoo!');
+        }
+
+        if (existingInCart) {
+            existingInCart.quantity += qtySold;
+            existingInCart.total_price = existingInCart.quantity * product.selling_price;
+            existingInCart.profit = existingInCart.quantity * (product.selling_price - product.buying_price);
+        } else {
+            cartList.push({
+                product_id: product.id,
+                name: product.name,
+                selling_price: product.selling_price,
+                buying_price: product.buying_price,
+                quantity: qtySold,
+                total_price: qtySold * product.selling_price,
+                profit: qtySold * (product.selling_price - product.buying_price)
+            });
+        }
+
+        document.getElementById('addToCartForm').reset();
+        renderCart();
+    });
+
+    function renderCart() {
+        const cartBody = document.getElementById('cartTableBody');
+        const grandTotalEl = document.getElementById('cartGrandTotal');
+        const checkoutBtn = document.getElementById('btnCompleteCartSale');
+
+        cartBody.innerHTML = '';
+        if (cartList.length === 0) {
+            cartBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #777;">Kikapu ni tupu</td></tr>';
+            grandTotalEl.innerText = '0 TZS';
+            checkoutBtn.disabled = true;
+            return;
+        }
+
+        let grandTotal = 0;
+        cartList.forEach((item, index) => {
+            grandTotal += item.total_price;
+            cartBody.innerHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.total_price.toLocaleString()}</td>
+                    <td><button type="button" class="btn-sm btn-delete" onclick="removeFromCart(${index})" style="padding: 2px 6px;">X</button></td>
+                </tr>
+            `;
+        });
+
+        grandTotalEl.innerText = grandTotal.toLocaleString() + ' TZS';
+        checkoutBtn.disabled = false;
+    }
+
+    window.removeFromCart = (index) => {
+        cartList.splice(index, 1);
+        renderCart();
+    };
+
+    // KAMILISHA MAUZO
+    window.checkoutCart = async () => {
+        if (cartList.length === 0) return;
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return alert('Tafadhali ingia tena!');
+
+        for (const item of cartList) {
+            const { error: saleError } = await db.from('sales').insert([{
+                product_id: item.product_id,
+                quantity_sold: item.quantity,
+                total_price: item.total_price,
+                profit: item.profit,
+                user_id: user.id
+            }]);
+
+            if (saleError) {
+                alert('Hitilafu kwenye mauzo: ' + saleError.message);
+                return;
+            }
+
+            const product = productsList.find(p => p.id === item.product_id);
+            if (product) {
+                await db.from('products').update({ quantity: product.quantity - item.quantity }).eq('id', item.product_id);
+            }
+        }
+
+        showReceipt(cartList);
+
+        cartList = [];
+        renderCart();
+        loadProducts();
+        loadTodayStats();
+    };
+
+    function showReceipt(items) {
+        document.getElementById('receiptStoreName').innerText = currentStoreName;
+        document.getElementById('receiptDate').innerText = 'Tarehe: ' + new Date().toLocaleString();
+        
+        const listContainer = document.getElementById('receiptItemsList');
+        listContainer.innerHTML = '';
+
+        let grandTotal = 0;
+        items.forEach(item => {
+            grandTotal += item.total_price;
+            listContainer.innerHTML += `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px;">
+                    <span>${item.name} (x${item.quantity})</span>
+                    <span>${item.total_price.toLocaleString()} TZS</span>
+                </div>
+            `;
+        });
+
+        document.getElementById('receiptTotalAmount').innerText = grandTotal.toLocaleString() + ' TZS';
+        document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    window.closeReceiptModal = () => {
+        document.getElementById('receiptModal').classList.add('hidden');
+    };
+
+    async function loadTodayStats() {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const { data, error } = await db
+            .from('sales')
+            .select('total_price, profit')
+            .gte('created_at', startOfDay.toISOString());
+
+        if (!error && data) {
+            const totalSales = data.reduce((sum, s) => sum + Number(s.total_price || 0), 0);
+            const totalProfit = data.reduce((sum, s) => sum + Number(s.profit || 0), 0);
+            document.getElementById('totalSalesToday').innerText = totalSales.toLocaleString() + ' TZS';
+            document.getElementById('totalProfitToday').innerText = totalProfit.toLocaleString() + ' TZS';
+        }
+    }
+
+    checkUserSession();
+</script>
+
+</body>
+</html>
